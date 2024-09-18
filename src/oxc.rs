@@ -142,15 +142,7 @@ impl zed_extension_api::Extension for OxcExtension {
         let path = self.server_script_path(language_server_id, worktree)?;
         let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
 
-        let mut args = vec![
-            "--import-plugin".to_string(),
-            "--jest-plugin".to_string(),
-            "--jsx-a11y-plugin".to_string(),
-            "--jsdoc-plugin".to_string(),
-            "--nextjs-plugin".to_string(),
-            "--vitest-plugin".to_string(),
-            "--promise-plugin".to_string(),
-        ];
+        let mut args = vec![];
 
         if let Some(settings) = settings.settings {
             let config_path = self.config_path(worktree, &settings);
@@ -175,7 +167,6 @@ impl zed_extension_api::Extension for OxcExtension {
             .join(path)
             .to_string_lossy()
             .to_string();
-        zed_extension_api::make_file_executable(&bin).unwrap();
 
         if let Some(binary) = settings.binary {
             return Ok(zed::Command {
