@@ -12,7 +12,7 @@ use zed_extension_api::{
 const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
 const PACKAGE_NAME: &str = "oxlint";
 
-const OXC_CONFIG_PATHS: &[&str] = &[".oxlintrc.json"];
+const OXC_CONFIG_PATHS: &[&str] = &["oxlintrc.json"];
 
 struct OxcExtension;
 
@@ -25,7 +25,7 @@ impl OxcExtension {
         let (platform, arch) = zed_extension_api::current_platform();
 
         Ok(format!(
-            "@oxclint/{platform}-{arch}/oxc_language_server",
+            "@oxlint/{platform}-{arch}/oxc_language_server",
             platform = match platform {
                 zed::Os::Mac => "darwin",
                 zed::Os::Linux => "linux",
@@ -59,11 +59,12 @@ impl OxcExtension {
 
         if server_package_exists {
             let worktree_root_path = worktree.root_path();
-
-            return Ok(Path::new(worktree_root_path.as_str())
+            let path = Path::new(worktree_root_path.as_str())
                 .join(SERVER_PATH)
                 .to_string_lossy()
-                .to_string());
+                .to_string();
+            zed::make_file_executable(&path);
+            return Ok(path);
         }
 
         // fallback to extension owned biome
@@ -157,7 +158,7 @@ impl zed_extension_api::Extension for OxcExtension {
                 args.push(config_path.clone());
             } else if require_config_file {
                 return Err(
-                    ".oxlintrc.json is not found but require_config_file is true".to_string(),
+                    "oxlintrc.json is not found but require_config_file is true".to_string()
                 );
             }
         }
