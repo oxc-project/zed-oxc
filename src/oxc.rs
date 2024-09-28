@@ -63,7 +63,6 @@ impl OxcExtension {
                 .join(SERVER_PATH)
                 .to_string_lossy()
                 .to_string();
-            zed::make_file_executable(&path);
             return Ok(path);
         }
 
