@@ -2,9 +2,9 @@ authors = ["suxiaoshao <https://github.com/suxiaoshao>"]
 description = "Oxc support for Zed"
 id = "oxc"
 name = "Oxc"
-repository = "https://github.com/suxiaoshao/zed-oxc"
+repository = "https://github.com/oxc-project/zed-oxc"
 schema_version = 1
-version = "0.1.1"
+version = "0.1.2"
 
 [language_servers.oxc]
 code_actions_kind = ["", "quickfix"]
