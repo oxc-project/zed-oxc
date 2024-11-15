@@ -10,4 +10,4 @@ crate-type = ["cdylib"]
 path = "src/oxc.rs"
 
 [dependencies]
-zed_extension_api = "0.1.0"
+zed_extension_api = "0.2.0"
