@@ -1,7 +1,4 @@
-use std::{
-    env, fs,
-    path::{Path, PathBuf},
-};
+use std::{env, fs, path::Path};
 use zed_extension_api::{
     self as zed,
     serde_json::{self, Value},
@@ -17,26 +14,8 @@ const OXC_CONFIG_PATHS: &[&str] = &["oxlintrc.json"];
 struct OxcExtension;
 
 impl OxcExtension {
-    fn server_exists(&self, path: &PathBuf) -> bool {
+    fn server_exists(&self, path: &Path) -> bool {
         fs::metadata(path).map_or(false, |stat| stat.is_file())
-    }
-
-    fn binary_specifier(&self) -> Result<String> {
-        let (platform, arch) = zed_extension_api::current_platform();
-
-        Ok(format!(
-            "@oxlint/{platform}-{arch}/oxc_language_server",
-            platform = match platform {
-                zed::Os::Mac => "darwin",
-                zed::Os::Linux => "linux",
-                zed::Os::Windows => "win32",
-            },
-            arch = match arch {
-                zed::Architecture::Aarch64 => "arm64",
-                zed::Architecture::X8664 => "x64",
-                _ => return Err(format!("unsupported architecture: {arch:?}")),
-            },
-        ))
     }
 
     fn server_script_path(
@@ -72,7 +51,7 @@ impl OxcExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let fallback_server_path = &Path::new("./node_modules").join(self.binary_specifier()?);
+        let fallback_server_path = Path::new("./node_modules/.bin/oxc_language_server");
         let version = zed::npm_package_latest_version(PACKAGE_NAME)?;
 
         if !self.server_exists(fallback_server_path)
