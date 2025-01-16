@@ -15,7 +15,7 @@ struct OxcExtension;
 
 impl OxcExtension {
     fn server_exists(&self, path: &Path) -> bool {
-        fs::metadata(path).map_or(false, |stat| stat.is_file())
+        fs::metadata(path).is_ok_and(|stat| stat.is_file())
     }
 
     fn server_script_path(
