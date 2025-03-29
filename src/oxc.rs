@@ -9,8 +9,6 @@ use zed_extension_api::{
 const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
 const PACKAGE_NAME: &str = "oxlint";
 
-const OXC_CONFIG_PATHS: &[&str] = &["oxlintrc.json"];
-
 struct OxcExtension;
 
 impl OxcExtension {
@@ -88,14 +86,6 @@ impl OxcExtension {
         let config_path_setting = settings.get("config_path").and_then(|value| value.as_str());
 
         if let Some(config_path) = config_path_setting {
-            if worktree.read_text_file(config_path).is_ok() {
-                return Some(config_path.to_string());
-            } else {
-                return None;
-            }
-        }
-
-        for config_path in OXC_CONFIG_PATHS {
             if worktree.read_text_file(config_path).is_ok() {
                 return Some(config_path.to_string());
             }
