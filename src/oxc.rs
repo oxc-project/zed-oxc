@@ -8,8 +8,9 @@ use zed_extension_api::{
 
 const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
 const PACKAGE_NAME: &str = "oxlint";
+const FALLBACK_SERVER_PATH: &str = "./node_modules/.bin/oxc_language_server";
 
-const OXC_CONFIG_PATHS: &[&str] = &["oxlintrc.json"];
+const OXC_CONFIG_PATHS: &[&str] = &[".oxlintrc.json"];
 
 struct OxcExtension;
 
@@ -51,7 +52,7 @@ impl OxcExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let fallback_server_path = Path::new("./node_modules/.bin/oxc_language_server");
+        let fallback_server_path = Path::new(FALLBACK_SERVER_PATH);
         let version = zed::npm_package_latest_version(PACKAGE_NAME)?;
 
         if !self.server_exists(fallback_server_path)
@@ -136,7 +137,7 @@ impl zed_extension_api::Extension for OxcExtension {
                 args.push(config_path.clone());
             } else if require_config_file {
                 return Err(
-                    "oxlintrc.json is not found but require_config_file is true".to_string()
+                    ".oxlintrc.json is not found but require_config_file is true".to_string(),
                 );
             }
         }
