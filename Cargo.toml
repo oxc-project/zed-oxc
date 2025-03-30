@@ -1,7 +1,7 @@
 [package]
 name = "zed-oxc"
-version = "0.1.3"
-edition = "2021"
+version = "0.1.4"
+edition = "2024"
 license = "MIT"
 publish = false
 
