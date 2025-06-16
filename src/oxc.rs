@@ -25,7 +25,7 @@ impl OxcExtension {
         worktree: &zed::Worktree,
     ) -> Result<String> {
         // This is a workaround, as reading the file from wasm doesn't work.
-        // Instead we try to read the `package.json`, see if `@biomejs/biome` is installed
+        // Instead we try to read the `package.json`, see if `oxlint` is installed
         let package_json = worktree
             .read_text_file("package.json")
             .unwrap_or(String::from(r#"{}"#));
