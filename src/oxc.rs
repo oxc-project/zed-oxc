@@ -1,15 +1,21 @@
 use std::{env, fs, path::Path};
 use zed_extension_api::{
-    self as zed,
+    self as zed, LanguageServerId, Result,
     serde_json::{self, Value},
     settings::LspSettings,
-    LanguageServerId, Result,
 };
 
-const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
+const SERVER_PATH: &str = if cfg!(windows) {
+    "node_modules/oxlint/bin/oxc_language_server.exe"
+} else {
+    "node_modules/oxlint/bin/oxc_language_server"
+};
+const FALLBACK_SERVER_PATH: &str = if cfg!(windows) {
+    "./node_modules/.bin/oxc_language_server.exe"
+} else {
+    "./node_modules/.bin/oxc_language_server"
+};
 const PACKAGE_NAME: &str = "oxlint";
-const FALLBACK_SERVER_PATH: &str = "./node_modules/.bin/oxc_language_server";
-
 const OXC_CONFIG_PATHS: &[&str] = &[".oxlintrc.json"];
 
 struct OxcExtension;
@@ -67,8 +73,8 @@ impl OxcExtension {
                 Ok(()) => {
                     if !self.server_exists(fallback_server_path) {
                         Err(format!(
-              "installed package '{PACKAGE_NAME}' did not contain expected path '{fallback_server_path:?}'",
-            ))?;
+                            "installed package '{PACKAGE_NAME}' did not contain expected path '{fallback_server_path:?}'",
+                        ))?;
                     }
                 }
                 Err(error) => {
