@@ -5,13 +5,12 @@ use zed_extension_api::{
     settings::LspSettings,
 };
 
-const SERVER_PATH: &str = if cfg!(windows) {
-    "node_modules/oxlint/bin/oxc_language_server.exe"
-} else {
-    "node_modules/oxlint/bin/oxc_language_server"
-};
+// the general expected server path (excluded for windows)
+const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
+
+// fallback to the wrapper script
 const FALLBACK_SERVER_PATH: &str = if cfg!(windows) {
-    "./node_modules/.bin/oxc_language_server.exe"
+    "./node_modules/.bin/oxc_language_server.CMD"
 } else {
     "./node_modules/.bin/oxc_language_server"
 };
@@ -43,7 +42,8 @@ impl OxcExtension {
                 || !f["devDependencies"][PACKAGE_NAME].is_null()
         });
 
-        if server_package_exists {
+        // windows needs the `.CMD` file, which is only inside `node_modules/.bin`.
+        if server_package_exists && !cfg!(windows) {
             let worktree_root_path = worktree.root_path();
             let path = Path::new(worktree_root_path.as_str())
                 .join(SERVER_PATH)
