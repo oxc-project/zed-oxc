@@ -8,12 +8,6 @@ use zed_extension_api::{
 // the general expected server path (excluded for windows)
 const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
 
-// fallback to the wrapper script
-const FALLBACK_SERVER_PATH: &str = if cfg!(windows) {
-    "./node_modules/.bin/oxc_language_server.CMD"
-} else {
-    "./node_modules/.bin/oxc_language_server"
-};
 const PACKAGE_NAME: &str = "oxlint";
 const OXC_CONFIG_PATHS: &[&str] = &[".oxlintrc.json"];
 
@@ -42,8 +36,9 @@ impl OxcExtension {
                 || !f["devDependencies"][PACKAGE_NAME].is_null()
         });
 
-        // windows needs the `.CMD` file, which is only inside `node_modules/.bin`.
-        if server_package_exists && !cfg!(windows) {
+        // On Windows, the direct server path is never used because Windows always requires the `.CMD` wrapper
+        // from the `.bin` directory. Therefore, we only use the direct server path on non-Windows platforms.
+        if server_package_exists && zed::current_platform().0 != zed::Os::Windows {
             let worktree_root_path = worktree.root_path();
             let path = Path::new(worktree_root_path.as_str())
                 .join(SERVER_PATH)
@@ -58,7 +53,11 @@ impl OxcExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let fallback_server_path = Path::new(FALLBACK_SERVER_PATH);
+        let fallback_server_path = Path::new(if zed::current_platform().0 == zed::Os::Windows {
+            "./node_modules/.bin/oxc_language_server.CMD"
+        } else {
+            "./node_modules/.bin/oxc_language_server"
+        });
         let version = zed::npm_package_latest_version(PACKAGE_NAME)?;
 
         if !self.server_exists(fallback_server_path)
