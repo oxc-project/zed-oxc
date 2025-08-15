@@ -36,9 +36,11 @@ impl OxcExtension {
                 || !f["devDependencies"][PACKAGE_NAME].is_null()
         });
 
+        let is_windows = zed::current_platform().0 == zed::Os::Windows;
+
         // On Windows, the direct server path is never used because Windows always requires the `.CMD` wrapper
         // from the `.bin` directory. Therefore, we only use the direct server path on non-Windows platforms.
-        if server_package_exists && zed::current_platform().0 != zed::Os::Windows {
+        if server_package_exists && !is_windows {
             let worktree_root_path = worktree.root_path();
             let path = Path::new(worktree_root_path.as_str())
                 .join(SERVER_PATH)
@@ -53,7 +55,7 @@ impl OxcExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let fallback_server_path = Path::new(if zed::current_platform().0 == zed::Os::Windows {
+        let fallback_server_path = Path::new(if is_windows {
             "./node_modules/.bin/oxc_language_server.CMD"
         } else {
             "./node_modules/.bin/oxc_language_server"
