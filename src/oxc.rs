@@ -1,15 +1,14 @@
 use std::{env, fs, path::Path};
 use zed_extension_api::{
-    self as zed,
+    self as zed, LanguageServerId, Result,
     serde_json::{self, Value},
     settings::LspSettings,
-    LanguageServerId, Result,
 };
 
+// the general expected server path (excluded for windows)
 const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
-const PACKAGE_NAME: &str = "oxlint";
-const FALLBACK_SERVER_PATH: &str = "./node_modules/.bin/oxc_language_server";
 
+const PACKAGE_NAME: &str = "oxlint";
 const OXC_CONFIG_PATHS: &[&str] = &[".oxlintrc.json"];
 
 struct OxcExtension;
@@ -37,7 +36,11 @@ impl OxcExtension {
                 || !f["devDependencies"][PACKAGE_NAME].is_null()
         });
 
-        if server_package_exists {
+        let is_windows = zed::current_platform().0 == zed::Os::Windows;
+
+        // On Windows, the direct server path is never used because Windows always requires the `.CMD` wrapper
+        // from the `.bin` directory. Therefore, we only use the direct server path on non-Windows platforms.
+        if server_package_exists && !is_windows {
             let worktree_root_path = worktree.root_path();
             let path = Path::new(worktree_root_path.as_str())
                 .join(SERVER_PATH)
@@ -52,7 +55,11 @@ impl OxcExtension {
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let fallback_server_path = Path::new(FALLBACK_SERVER_PATH);
+        let fallback_server_path = Path::new(if is_windows {
+            "./node_modules/.bin/oxc_language_server.CMD"
+        } else {
+            "./node_modules/.bin/oxc_language_server"
+        });
         let version = zed::npm_package_latest_version(PACKAGE_NAME)?;
 
         if !self.server_exists(fallback_server_path)
@@ -67,8 +74,8 @@ impl OxcExtension {
                 Ok(()) => {
                     if !self.server_exists(fallback_server_path) {
                         Err(format!(
-              "installed package '{PACKAGE_NAME}' did not contain expected path '{fallback_server_path:?}'",
-            ))?;
+                            "installed package '{PACKAGE_NAME}' did not contain expected path '{fallback_server_path:?}'",
+                        ))?;
                     }
                 }
                 Err(error) => {
