@@ -1,7 +1,7 @@
 use std::{env, fs, path::Path};
 use zed_extension_api::{
     self as zed, LanguageServerId, Result,
-    serde_json::{self, Value},
+    serde_json::{self},
     settings::LspSettings,
 };
 
@@ -9,7 +9,6 @@ use zed_extension_api::{
 const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
 
 const PACKAGE_NAME: &str = "oxlint";
-const OXC_CONFIG_PATHS: &[&str] = &[".oxlintrc.json"];
 
 struct OxcExtension;
 
@@ -90,27 +89,6 @@ impl OxcExtension {
 
         Ok(fallback_server_path.to_string_lossy().to_string())
     }
-
-    // Returns the path if a config file exists
-    pub fn config_path(&self, worktree: &zed::Worktree, settings: &Value) -> Option<String> {
-        let config_path_setting = settings.get("config_path").and_then(|value| value.as_str());
-
-        if let Some(config_path) = config_path_setting {
-            if worktree.read_text_file(config_path).is_ok() {
-                return Some(config_path.to_string());
-            } else {
-                return None;
-            }
-        }
-
-        for config_path in OXC_CONFIG_PATHS {
-            if worktree.read_text_file(config_path).is_ok() {
-                return Some(config_path.to_string());
-            }
-        }
-
-        None
-    }
 }
 
 impl zed_extension_api::Extension for OxcExtension {
@@ -129,25 +107,7 @@ impl zed_extension_api::Extension for OxcExtension {
         let path = self.server_script_path(language_server_id, worktree)?;
         let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
 
-        let mut args = vec![];
-
-        if let Some(settings) = settings.settings {
-            let config_path = self.config_path(worktree, &settings);
-
-            let require_config_file = settings
-                .get("require_config_file")
-                .and_then(|value| value.as_bool())
-                .unwrap_or(false);
-
-            if let Some(config_path) = config_path {
-                args.push("--config".to_string());
-                args.push(config_path.clone());
-            } else if require_config_file {
-                return Err(
-                    ".oxlintrc.json is not found but require_config_file is true".to_string(),
-                );
-            }
-        }
+        let args = vec![];
 
         let bin = env::current_dir()
             .unwrap()
@@ -168,6 +128,25 @@ impl zed_extension_api::Extension for OxcExtension {
             args,
             env: Default::default(),
         })
+    }
+
+    fn language_server_workspace_configuration(
+        &mut self,
+        language_server_id: &LanguageServerId,
+        worktree: &zed_extension_api::Worktree,
+    ) -> Result<Option<serde_json::Value>> {
+        let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
+        Ok(settings
+            .initialization_options
+            .and_then(|data| data.get("options").cloned()))
+    }
+    fn language_server_initialization_options(
+        &mut self,
+        language_server_id: &LanguageServerId,
+        worktree: &zed_extension_api::Worktree,
+    ) -> Result<Option<serde_json::Value>> {
+        let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
+        Ok(settings.initialization_options)
     }
 }
 
