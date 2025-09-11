@@ -1,4 +1,7 @@
-use std::{env, fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use zed_extension_api::{
     self as zed, LanguageServerId, Result,
     serde_json::{self},
@@ -6,62 +9,68 @@ use zed_extension_api::{
 };
 
 // the general expected server path (excluded for windows)
-const SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
+const WORKTREE_SERVER_PATH: &str = "node_modules/oxlint/bin/oxc_language_server";
 
 const PACKAGE_NAME: &str = "oxlint";
 
 struct OxcExtension;
 
 impl OxcExtension {
-    fn server_exists(&self, path: &Path) -> bool {
+    fn extension_server_exists(&self, path: &Path) -> bool {
         fs::metadata(path).is_ok_and(|stat| stat.is_file())
     }
 
-    fn server_script_path(
-        &mut self,
-        language_server_id: &LanguageServerId,
-        worktree: &zed::Worktree,
-    ) -> Result<String> {
+    fn binary_specifier(&self) -> Result<String, String> {
+        let (platform, arch) = zed::current_platform();
+
+        let binary_name = match platform {
+            zed::Os::Windows => "oxc_language_server.exe",
+            _ => "oxc_language_server",
+        };
+
+        Ok(format!(
+            "@oxlint/{platform}-{arch}/{binary}",
+            platform = match platform {
+                zed::Os::Mac => "darwin",
+                zed::Os::Linux => "linux",
+                zed::Os::Windows => "win32",
+            },
+            arch = match arch {
+                zed::Architecture::Aarch64 => "arm64",
+                zed::Architecture::X8664 => "x64",
+                _ => return Err(format!("unsupported architecture: {arch:?}")),
+            },
+            binary = binary_name,
+        ))
+    }
+
+    fn workspace_oxc_exists(&self, worktree: &zed::Worktree) -> bool {
         // This is a workaround, as reading the file from wasm doesn't work.
         // Instead we try to read the `package.json`, see if `oxlint` is installed
         let package_json = worktree
             .read_text_file("package.json")
             .unwrap_or(String::from(r#"{}"#));
+
         let package_json: Option<serde_json::Value> =
             serde_json::from_str(package_json.as_str()).ok();
 
-        let server_package_exists = package_json.is_some_and(|f| {
+        package_json.is_some_and(|f| {
             !f["dependencies"][PACKAGE_NAME].is_null()
                 || !f["devDependencies"][PACKAGE_NAME].is_null()
-        });
+        })
+    }
 
-        let is_windows = zed::current_platform().0 == zed::Os::Windows;
-
-        // On Windows, the direct server path is never used because Windows always requires the `.CMD` wrapper
-        // from the `.bin` directory. Therefore, we only use the direct server path on non-Windows platforms.
-        if server_package_exists && !is_windows {
-            let worktree_root_path = worktree.root_path();
-            let path = Path::new(worktree_root_path.as_str())
-                .join(SERVER_PATH)
-                .to_string_lossy()
-                .to_string();
-            return Ok(path);
-        }
-
-        // fallback to extension owned biome
+    fn check_oxc_updates(&mut self, language_server_id: &LanguageServerId) -> Result<()> {
+        // fallback to extension owned oxlint
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
 
-        let fallback_server_path = Path::new(if is_windows {
-            "./node_modules/.bin/oxc_language_server.CMD"
-        } else {
-            "./node_modules/.bin/oxc_language_server"
-        });
+        let extension_server_path = &Path::new("./node_modules").join(self.binary_specifier()?);
         let version = zed::npm_package_latest_version(PACKAGE_NAME)?;
 
-        if !self.server_exists(fallback_server_path)
+        if !self.extension_server_exists(extension_server_path)
             || zed::npm_package_installed_version(PACKAGE_NAME)?.as_ref() != Some(&version)
         {
             zed::set_language_server_installation_status(
@@ -71,14 +80,14 @@ impl OxcExtension {
             let result = zed::npm_install_package(PACKAGE_NAME, &version);
             match result {
                 Ok(()) => {
-                    if !self.server_exists(fallback_server_path) {
+                    if !self.extension_server_exists(extension_server_path) {
                         Err(format!(
-                            "installed package '{PACKAGE_NAME}' did not contain expected path '{fallback_server_path:?}'",
+                            "installed package '{PACKAGE_NAME}' did not contain expected path '{extension_server_path:?}'",
                         ))?;
                     }
                 }
                 Err(error) => {
-                    if !self.server_exists(fallback_server_path) {
+                    if !self.extension_server_exists(extension_server_path) {
                         Err(format!(
                             "failed to install package '{PACKAGE_NAME}': {error}"
                         ))?;
@@ -87,7 +96,7 @@ impl OxcExtension {
             }
         }
 
-        Ok(fallback_server_path.to_string_lossy().to_string())
+        Ok(())
     }
 }
 
@@ -104,27 +113,45 @@ impl zed_extension_api::Extension for OxcExtension {
         language_server_id: &zed_extension_api::LanguageServerId,
         worktree: &zed_extension_api::Worktree,
     ) -> zed_extension_api::Result<zed_extension_api::Command> {
-        let path = self.server_script_path(language_server_id, worktree)?;
         let settings = LspSettings::for_worktree(language_server_id.as_ref(), worktree)?;
 
-        let args = vec![];
+        let mut args = vec![];
 
-        let bin = env::current_dir()
-            .unwrap()
-            .join(path)
-            .to_string_lossy()
-            .to_string();
-
+        // check and run oxlint with custom binary
         if let Some(binary) = settings.binary {
             return Ok(zed::Command {
-                command: binary.path.map_or(bin, |path| path),
+                command: binary
+                    .path
+                    .map_or(WORKTREE_SERVER_PATH.to_string(), |path| path),
                 args: binary.arguments.map_or(args, |args| args),
                 env: Default::default(),
             });
         }
 
+        // try to run oxlint with workspace oxc
+        if self.workspace_oxc_exists(worktree) {
+            let server_path = Path::new(worktree.root_path().as_str())
+                .join(WORKTREE_SERVER_PATH)
+                .to_string_lossy()
+                .to_string();
+            let mut node_args = vec![server_path];
+            node_args.append(&mut args);
+
+            return Ok(zed::Command {
+                command: zed::node_binary_path()?,
+                args: node_args,
+                env: Default::default(),
+            });
+        }
+
+        // install/update and run oxlint for extension
+        self.check_oxc_updates(language_server_id)?;
+
+        let mut server_path = PathBuf::from("./node_modules");
+        server_path.push(self.binary_specifier()?);
+
         Ok(zed::Command {
-            command: bin,
+            command: server_path.to_string_lossy().to_string(),
             args,
             env: Default::default(),
         })
