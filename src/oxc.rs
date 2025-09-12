@@ -29,7 +29,7 @@ impl OxcExtension {
         };
 
         Ok(format!(
-            "@oxlint/{platform}-{arch}/{binary}",
+            "@oxlint/{platform}-{arch}{build}/{binary}",
             platform = match platform {
                 zed::Os::Mac => "darwin",
                 zed::Os::Linux => "linux",
@@ -39,6 +39,10 @@ impl OxcExtension {
                 zed::Architecture::Aarch64 => "arm64",
                 zed::Architecture::X8664 => "x64",
                 _ => return Err(format!("unsupported architecture: {arch:?}")),
+            },
+            build = match platform {
+                zed::Os::Linux => "-gnu",
+                _ => "",
             },
             binary = binary_name,
         ))
