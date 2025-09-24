@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "zed-oxc"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "zed_extension_api",
 ]
