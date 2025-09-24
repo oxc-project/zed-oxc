@@ -28,6 +28,12 @@ impl OxcExtension {
             _ => "oxc_language_server",
         };
 
+        // Zed does not currently provide an API to determine whether it is gnu or musl,
+        // So on Linux you need to run the sh (./node_modules/.bin/oxc_language_server) script.
+        if let zed::Os::Linux = platform {
+            return Ok(".bin/oxc_language_server".to_string());
+        }
+
         Ok(format!(
             "@oxlint/{platform}-{arch}{build}/{binary}",
             platform = match platform {
